@@ -10,18 +10,15 @@ from absl import app
 import flags
 FLAGS = flags.FLAGS
 
-# import tensorflow.experimental.numpy as tnp
-# tnp.experimental_enable_numpy_behavior()
 ########################################################################################################################
 def main(*argv):
     if argv[0] == __file__:
         utils.tf_init()
     # init
     base_dir = os.path.dirname(os.path.realpath(__file__)) # getcwd()
-    log_dir = join(base_dir, 'log')
+    log_dir = join(base_dir, '../log')
     dirs = ['plt', 'checkpoint']
     paths = [join(log_dir, dir) for dir in dirs]
-    [utils.mkdir(path) for path in paths]
     plt_dir, ckpt_dir = paths
 
     ### ckpt
@@ -32,8 +29,8 @@ def main(*argv):
 
     ### Get Data
     _dataset = stroke
-    dataset, val_dataset = _dataset.build(batch_size=FLAGS.bsz, validation_split=0.2) # [0]:train [1]:valid or None
-    adc_dataset, dwi_dataset = _dataset.build_test(FLAGS.bsz)
+    print(FLAGS.inputs)
+    dataset, sizes = _dataset.build_for_pred(FLAGS.inputs)
     num_class, input_shape = _dataset.num_class, _dataset.input_shape
 
     ### Build model
@@ -43,16 +40,8 @@ def main(*argv):
     model = tf.keras.Model(input, output, name=None)
 
     ### Compile model
-    metric_list = [
-        metrics.Precision(num_class),
-        metrics.Recall(num_class),
-        metrics.F_Score(num_class),
-        metrics.DSC(num_class),
-        metrics.JSC(num_class),
-    ]
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
                   loss=losses.WCE(),
-                  metrics=metric_list,
                   )
 
     ### load weights
@@ -69,21 +58,11 @@ def main(*argv):
         initial_epoch = 0
 
     ### Train model
-    history = model.fit(
-        x = dataset,
-        epochs=200,
-        validation_data=val_dataset,
-        initial_epoch=initial_epoch,
-        callbacks=[
-            ModelCheckpoint(ckpt_file_path, monitor='loss', save_best_only=True, save_weights_only=False, save_freq='epoch'),
-            # EarlyStopping(monitor='loss', min_delta=0, patience=5),
-            # ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=2, verbose=0, min_delta=0.0001, cooldown=0, min_lr=0),
-            # callbacks.setLR(0.0001),
-            callbacks.monitor(plt_dir, dataset=adc_dataset)
-        ]
+    output = model.predict_step(
+        dataset,
     )
-    # date = datetime.datetime.today().strftime('%Y-%m-%d_%Hh%Mm%Ss')
-    # utils.save_history(history, utils.join_dir([base_dir, 'log', date]))
+    print(output.shape)
+    print(type(output))
 
 if __name__ == '__main__':
     app.run(main)

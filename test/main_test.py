@@ -23,14 +23,24 @@ def main(*argv):
     else: # inference
         """ 모델 불러오기 """
         base_dir = os.path.dirname(os.path.realpath(__file__))  # getcwd()
-        ckpt_dir = join(base_dir, 'log', 'tmp_model') if FLAGS.ckpt_dir==None else FLAGS.ckpt_dir
+        ckpt_dir = join(base_dir, '../log', 'checkpoint', '*') if FLAGS.ckpt_dir == None else FLAGS.ckpt_dir
+        from glob import glob
+        ckpt = glob(ckpt_dir)[0]
         # ckpt = callbacks.load_weights._get_most_recently_modified_file_matching_pattern(ckpt_dir)
-        model = tf.keras.models.load_model(ckpt_dir)
+        print(f'ckpt={ckpt}')
+        if ckpt != None and callbacks.load_weights.checkpoint_exists(ckpt):
+            model = tf.keras.Model.load_weights(filepath=ckpt)
+        else:
+            raise RuntimeError(f'Model Checkpoint is not fount, accepted "{ckpt}".')
 
-        dataset, sizes = data.build_for_pred(FLAGS.inputs)
+
+
+        dataset =
 
 
         if FLAGS.predict_step:
+
+
             output = model.predict_step(dataset)
             """
             predict_on_batch 의 경우 tf.dataset을 받을 수 없음
@@ -46,13 +56,9 @@ def main(*argv):
                 workers=1,
                 use_multiprocessing=False
             )
-        #### output post_processing
-        output = np.squeeze(np.argmax(output, -1))
-        sep_inputs = []
-        for size in sizes:
-            sep_inputs.append(output[:size])
-            output = output[size:]
-        # output = np.transpose(output, [1, 2, 0])
+        # output
+        output = np.squeeze(output)
+        # output = np.transpose(output, [1,2,0])
         dir, basename = os.path.split(FLAGS.input)
         seg_file_name = 'seg_' + basename
         output_save_path = os.path.join(dir, seg_file_name)

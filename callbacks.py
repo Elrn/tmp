@@ -10,6 +10,8 @@ import re
 import logging
 from tensorflow.keras import backend
 from keras.utils import io_utils
+import flags
+FLAGS = flags.FLAGS
 
 class monitor(tf.keras.callbacks.Callback):
     def __init__(self, save_dir, dataset=None, fig_size_rate=3):
@@ -19,91 +21,84 @@ class monitor(tf.keras.callbacks.Callback):
         self.fig_size_rate = fig_size_rate
     #
     def on_epoch_end(self, epoch, logs=None):
-        # self.reconstuction_plot(epoch, logs)
-        self.slices_plot(epoch, logs)
+        self.plot_single_modality(epoch, logs)
 
-    def slices_plot(self, epoch, logs=None):
+    def plot_single_modality(self, epoch, logs=None):
         epoch += 1
-        cols, rows = 2, 4
+        cols, rows = 2, FLAGS.bsz
         figure, axs = plt.subplots(cols, rows, figsize=(rows * 3, cols * 3))
-        figure.suptitle(f'Epoch: "{epoch}"', fontsize=10)
+        # figure.suptitle(f'Epoch: "{epoch}"', fontsize=10)
         figure.tight_layout()
-        for vol, seg in self.dataset.skip(15).take(1):
-            pred = self.model(vol)
-            vol, seg, pred = np.squeeze(vol), np.squeeze(tf.argmax(seg, -1)), np.squeeze(tf.argmax(pred, -1))
+
+        stack = []
+        stack_seg = []
+        for data, seg in self.dataset.skip(4).take(1):
+            pred = self.model(data)
+            stack.append(pred)
+            stack_seg.append(seg)
+
+        # data = np.concatenate(stack, 0)
+        # seg = np.concatenate(stack_seg, 0)
+        data, seg, pred = np.squeeze(data), np.squeeze(tf.argmax(seg, -1)), np.squeeze(tf.argmax(pred, -1))
 
         for c in range(cols):
             for r in range(rows):
                 axs[c][r].set_xticks([])
                 axs[c][r].set_yticks([])
                 if c == 0:
-                    axs[c][r].imshow(vol[r], cmap='gray')
-                    axs[c][r].imshow(seg[r], cmap='Greens', alpha=0.5)
+                    axs[c][r].imshow(data[r], cmap='gray')
+                    axs[c][r].imshow(pred[r], cmap='Greens', alpha=0.5)
+                    # axs[c][r].imshow(data[11 + 1*r], cmap='gray')
+                    # axs[c][r].imshow(pred[11 + 1*r], cmap='Greens', alpha=0.5)
                 else:
-                    axs[c][r].imshow(vol[r], cmap='gray')
-                    axs[c][r].imshow(pred[r], cmap='Reds', alpha=0.5)
+                    axs[c][r].imshow(data[r], cmap='gray')
+                    axs[c][r].imshow(seg[r], cmap='Reds', alpha=0.5)
+                    # axs[c][r].imshow(data[11 + 1 * r], cmap='gray')
+                    # axs[c][r].imshow(seg[11 + 1 * r], cmap='Reds', alpha=0.5)
 
         save_path = os.path.join(self.save_dir, f'{epoch}.png')
         plt.savefig(save_path, dpi=200)
         plt.close('all')
 
-    def patch_wise_plot(self, epoch):
+    def plot(self, epoch, logs=None):
         epoch += 1
-        ncols = tf.data.experimental.cardinality(self.dataset).numpy() * 2
-        nrows = self.dataset.element_spec[0].shape[0]
-
-        figure, axs = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
-        figure.suptitle(f'{epoch}', fontsize=10)
-        figure.tight_layout()
-        slice = self.dataset.element_spec[0].shape[2] // 2
-        # cmap = self.get_cmap()
-        for i, (vol, seg) in enumerate(self.dataset):
-            pred = self.model.predict_on_batch(vol)
-            vol_, seg_, pred_ = vol, tf.argmax(seg, -1), tf.argmax(pred, -1)
-            for r in range(nrows):
-                vol, seg, pred = vol_[r], seg_[r], pred_[r]
-                axs[i * 2][r].set_xticks([])
-                axs[i * 2][r].set_yticks([])
-                axs[(i * 2) + 1][r].set_xticks([])
-                axs[(i * 2) + 1][r].set_yticks([])
-                axs[i * 2][r].imshow(vol[:, :, slice], cmap='gray')
-                axs[i * 2][r].imshow(seg[:, :, slice], cmap='Greens')
-                axs[(i * 2) + 1][r].imshow(vol[:, :, slice], cmap='gray')
-                axs[(i * 2) + 1][r].imshow(pred[:, :, slice], cmap='Reds', alpha=0.5)
-                for spine in axs[(i * 2) + 1][r].spines.values():
-                    spine.set_color('red')  # set Border color
-        save_path = os.path.join(self.save_dir, f'patches_{epoch:05}.png')
-        plt.savefig(save_path, dpi=150)
-        plt.close('all')
-
-    def reconstuction_plot(self, epoch):
         cols, rows = 2, 5
-        figure, axs  = plt.subplots(cols, rows, figsize=(rows*3,cols*3))
+        figure, axs = plt.subplots(cols, rows, figsize=(rows * 3, cols * 3))
+        figure.suptitle(f'Epoch: "{epoch}"', fontsize=10)
         figure.tight_layout()
-        vol, seg, pred = [], [], []
-        for vol_, seg_ in self.dataset:
-            pred_ = self.model.predict_on_batch(vol_)
-            vol.append(vol_), seg.append(seg_), pred.append(pred_)
-        vol, seg, pred = [tf.concat(arr, 0) for arr in (vol, seg, pred)]
-        vol, seg, pred = [utils.reconstruct_pathces(arr, 1, [1,160,160,200,1], [1,40,40,40,1], [1,40,40,40,1])
-                          for arr in (vol, seg, pred)]
-        vol, seg, pred = np.squeeze(vol), np.squeeze(tf.argmax(seg, -1)), np.squeeze(tf.argmax(pred, -1))
-        slice = int(vol.shape[2] * 0.7)
-        s = 5
+
+        stack = []
+        stack_seg = []
+        for data, seg in self.dataset:
+            pred = self.model(data)
+            stack.append(pred)
+            stack_seg.append(seg)
+
+        data = np.concatenate(stack, 0)
+        seg = np.concatenate(stack_seg, 0)
+        data, seg, pred = np.squeeze(data), np.squeeze(tf.argmax(seg, -1)), np.squeeze(tf.argmax(pred, -1))
+        adc, dwi = np.split(data, 2, 0)
+        adc_seg, dwi_seg = np.split(pred, 2, 0)
+        seg, _ = np.split(seg, 2, 0)
+
         for c in range(cols):
             for r in range(rows):
-                axs[c][r].set_title(f'{slice + 4 * r}/{vol.shape[2]}', fontsize=7)
                 axs[c][r].set_xticks([])
                 axs[c][r].set_yticks([])
                 if c == 0:
-                    axs[c][r].imshow(vol[:, :, slice+s*r], cmap='gray')
-                    axs[c][r].imshow(seg[:, :, slice+s*r], cmap='Greens', alpha=0.5)
+                    axs[c][r].imshow(adc[11 + 1*r], cmap='gray')
+                    axs[c][r].imshow(adc_seg[11 + 1*r], cmap='Greens', alpha=0.5)
+                if c == 1:
+                    axs[c][r].imshow(dwi[11 + 1 * r], cmap='gray')
+                    axs[c][r].imshow(dwi_seg[11 + 1 * r], cmap='Greens', alpha=0.5)
+                if c == 2:
+                    axs[c][r].imshow(adc[11 + 1 * r], cmap='gray')
+                    axs[c][r].imshow(seg[11 + 1 * r], cmap='Reds', alpha=0.5)
                 else:
-                    axs[c][r].imshow(vol[:, :, slice+s*r], cmap='gray')
-                    axs[c][r].imshow(pred[:, :, slice+s*r], cmap='Reds', alpha=0.5)
+                    axs[c][r].imshow(dwi[11 + 1 * r], cmap='gray')
+                    axs[c][r].imshow(seg[11 + 1 * r], cmap='Reds', alpha=0.5)
 
-        save_path = os.path.join(self.save_dir, f'reconstuction_{epoch}.png')
-        # figure.suptitle(f'{slice}/{vol.shape[2]} along Z axis', fontsize=5)
+        save_path = os.path.join(self.save_dir, f'{epoch}.png')
         plt.savefig(save_path, dpi=200)
         plt.close('all')
 

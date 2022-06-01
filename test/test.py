@@ -18,7 +18,7 @@ def main(*argv):
         utils.tf_init()
     # init
     base_dir = os.path.dirname(os.path.realpath(__file__)) # getcwd()
-    log_dir = join(base_dir, 'log')
+    log_dir = join(base_dir, '../log')
     dirs = ['plt', 'checkpoint']
     paths = [join(log_dir, dir) for dir in dirs]
     [utils.mkdir(path) for path in paths]
@@ -32,7 +32,6 @@ def main(*argv):
 
     ### Get Data
     _dataset = stroke
-    dataset, val_dataset = _dataset.build(batch_size=FLAGS.bsz, validation_split=0.2) # [0]:train [1]:valid or None
     adc_dataset, dwi_dataset = _dataset.build_test(FLAGS.bsz)
     num_class, input_shape = _dataset.num_class, _dataset.input_shape
 
@@ -70,20 +69,13 @@ def main(*argv):
 
     ### Train model
     history = model.fit(
-        x = dataset,
-        epochs=200,
-        validation_data=val_dataset,
-        initial_epoch=initial_epoch,
+        x = adc_dataset,
+        epochs=1,
         callbacks=[
-            ModelCheckpoint(ckpt_file_path, monitor='loss', save_best_only=True, save_weights_only=False, save_freq='epoch'),
-            # EarlyStopping(monitor='loss', min_delta=0, patience=5),
-            # ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=2, verbose=0, min_delta=0.0001, cooldown=0, min_lr=0),
-            # callbacks.setLR(0.0001),
-            callbacks.monitor(plt_dir, dataset=adc_dataset)
+            callbacks.monitor(plt_dir, dataset=dwi_dataset)
         ]
     )
-    # date = datetime.datetime.today().strftime('%Y-%m-%d_%Hh%Mm%Ss')
-    # utils.save_history(history, utils.join_dir([base_dir, 'log', date]))
+    model.save(join(log_dir, 'tmp_model'))
 
 if __name__ == '__main__':
     app.run(main)
