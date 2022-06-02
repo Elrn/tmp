@@ -3,6 +3,8 @@ dwi : contain skull
 adc
 seg
 
+! 기본적으로 float64 로 되어있어 변환 필요
+
 -------------------------------------------------
 원 이미지는 channel dimension 을 포함하지 않음
 > parsing 에서 dims 추가 필요 !
@@ -16,6 +18,7 @@ import os
 from os.path import basename
 import numpy as np
 import nibabel as nib
+import cv2
 
 import flags
 FLAGS = flags.FLAGS
@@ -36,8 +39,9 @@ def parse_fn(data, seg): # RANK: (4, 3)
     return (data, seg)
 
 def pred_parse_fn(x):
-    x = tf.image.per_image_standardization(x)
     x = tf.expand_dims(x, -1)
+    x = tf.image.per_image_standardization(x)
+    # x = tf.image.resize(x, input_shape[:2])
     x = tf.cast(x, 'float32')
     return x
 
@@ -61,20 +65,30 @@ def build_for_pred(paths):
         ).map(
             map_func=pred_parse_fn,
             num_parallel_calls=tf.data.experimental.AUTOTUNE
-        ).unbatch(
+        # ).unbatch(
         ).batch(batch_size=FLAGS.bsz,
         )
-    arrs = []
-    sizes = []
+
+    arrs, depths, headers, affines, img_shapes = [], [], [], [], []
     for path in paths:
         data = nib.load(path)
+        header = data.header
+        img_sz = header.get_data_shape()[:2]
+        affine = data.affine
         ndarray = data.get_fdata()
-        ndarray = tf.transpose(ndarray, [2, 0, 1])
-        size = ndarray.shape[0]
+        ndarray = cv2.resize(ndarray, dsize=input_shape[:2], interpolation=cv2.INTER_CUBIC)
+        ndarray = np.transpose(ndarray, [2, 0, 1])
+        depth = ndarray.shape[0]
+
         arrs.append(ndarray)
-        sizes.append(size)
+        depths.append(depth)
+        headers.append(header)
+        affines.append(affine)
+        img_shapes.append(img_sz)
+
+    arrs = np.concatenate(arrs, 0)
     dataset = get_dataset(arrs)
-    return dataset, sizes
+    return dataset, depths, headers, affines, img_shapes
 
 ########################################################################################################################
 def build(batch_size, validation_split=0.1):
@@ -143,26 +157,64 @@ def load_test(data, batch_size, drop=True):
 ########################################################################################################################
 """ Post-processing """
 ########################################################################################################################
-def post_processing(outputs, sizes):
+def post_processing(outputs, depths, headers, affines, img_shapes):
     """
     2D slices 로 진행했기 때문에 unbatch 된 output을 원래 크기에 맞도록 분할하여 stack으로 쌓아야 한다.
 
     transpose 여부 확인 필요 !
     """
-    outputs = np.squeeze(np.argmax(outputs, -1))
+    def upsampling(img, shape):
+        slices = []
+        for slice in img:
+            resized_slice = cv2.resize(slice, dsize=shape, interpolation=cv2.INTER_CUBIC)
+            slices.append(resized_slice)
+        return np.stack(slices, 0)
+
+    outputs = np.squeeze(np.argmax(outputs, -1)) # one_hot >> indices
     sep_inputs = []
-    for size in sizes:
-        sep_inputs.append(outputs[:size])
-        outputs = outputs[size:]
-    # output = np.transpose(output, [1, 2, 0])
-    outputs = np.stack(sep_inputs, 0)
+    for depth, img_sz in zip(depths, img_shapes):
+        x = outputs[:depth]
+        x = np.transpose(x, [1, 2, 0])
+        x = x.astype('uint8') # for cv2 resize
+        x = cv2.resize(x, dsize=img_sz, interpolation=cv2.INTER_CUBIC)
+        sep_inputs.append(x)
+        outputs = outputs[depth:]
+
 
     """ save output to 'nii.gz' files """
-    for path, output in zip(FLAGS.inputs, outputs):
+    for path, output, header, affine in zip(FLAGS.inputs, sep_inputs, headers, affines):
         dir, basename = os.path.split(path)
         seg_file_name = 'seg_' + basename
         output_save_path = os.path.join(dir, seg_file_name)
-        nib.save(output, output_save_path)
 
+        img = nib.Nifti1Image(output, affine, header=header)
+        # img.header.get_xyzt_units()
+        img.to_filename(output_save_path)
+
+########################################################################################################################
+""" Pre-processing """
+########################################################################################################################
+def pre_processing(paths):
+    def resize(input):
+        stack = []
+        for x in input:
+            stack.append(cv2.resize(x, input_shape[:2]))
+        output = np.stack(stack, 0)
+        return output
+
+    arrs = []
+    sizes = []
+    for path in paths:
+        data = nib.load(path)
+        ndarray = data.get_fdata()
+        ndarray = np.transpose(ndarray, [2, 0, 1])
+        ndarray = resize(ndarray)
+        ndarray = np.expand_dims(ndarray, -1)
+        size = ndarray.shape[0]
+        arrs.append(ndarray)
+        sizes.append(size)
+    arrs = np.concatenate(arrs, 0)
+    arrs = arrs.astype('float32')
+    return arrs, sizes
 
 ########################################################################################################################

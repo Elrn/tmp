@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 import os, logging, re
 from absl import app
@@ -26,8 +25,9 @@ def main(*argv, **kwargs):
         train.main(argv, _dataset=data)
 
     else: # inference
+        # saved_model_path = join(FLAGS.ckpt_dir, 'SavedModel.hdf5')
         saved_model_path = join(FLAGS.ckpt_dir, FLAGS.saved_model_name)
-        model = tf.keras.models.load_model(saved_model_path)
+        model = tf.keras.models.load_model(saved_model_path) # custom_objects를 설정해줘야 한다.
         dataset, sizes = data.build_for_pred(FLAGS.inputs)
 
         if FLAGS.predict_step: # predict_on_batch 의 경우 tf.dataset을 받을 수 없음
@@ -44,8 +44,6 @@ def main(*argv, **kwargs):
             )
         """ output post-processing """
         data.post_processing(outputs, sizes)
-
-
 
 ########################################################################################################################
 if __name__ == '__main__':

@@ -63,9 +63,10 @@ class _BASE(tf.keras.metrics.Metric):
             self.CM, np.zeros((self.num_classes, self.num_classes)))
 
     def get_config(self):
-        config = {'num_classes': self.num_classes}
-        base_config = super(_BASE, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+        config = super(_BASE, self).get_config()
+        # config.update({'num_classes': self.num_classes})
+
+        return config
 
 ########################################################################################################################
 class TP_leison(_BASE):
