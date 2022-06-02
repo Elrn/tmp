@@ -1,5 +1,5 @@
 """
-dwi : skull
+dwi : contain skull
 adc
 seg
 
@@ -12,6 +12,7 @@ seg
 ########################################################################################################################
 import tensorflow as tf
 import utils
+import os
 from os.path import basename
 import numpy as np
 import nibabel as nib
@@ -137,5 +138,31 @@ def load_test(data, batch_size, drop=True):
         ).unbatch(
         ).batch(batch_size=batch_size, drop_remainder=drop,
         )
+
+
+########################################################################################################################
+""" Post-processing """
+########################################################################################################################
+def post_processing(outputs, sizes):
+    """
+    2D slices 로 진행했기 때문에 unbatch 된 output을 원래 크기에 맞도록 분할하여 stack으로 쌓아야 한다.
+
+    transpose 여부 확인 필요 !
+    """
+    outputs = np.squeeze(np.argmax(outputs, -1))
+    sep_inputs = []
+    for size in sizes:
+        sep_inputs.append(outputs[:size])
+        outputs = outputs[size:]
+    # output = np.transpose(output, [1, 2, 0])
+    outputs = np.stack(sep_inputs, 0)
+
+    """ save output to 'nii.gz' files """
+    for path, output in zip(FLAGS.inputs, outputs):
+        dir, basename = os.path.split(path)
+        seg_file_name = 'seg_' + basename
+        output_save_path = os.path.join(dir, seg_file_name)
+        nib.save(output, output_save_path)
+
 
 ########################################################################################################################

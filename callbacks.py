@@ -1,4 +1,4 @@
-from tensorflow.keras.callbacks import *
+from tensorflow.python.keras.callbacks import *
 import tensorflow as tf
 import matplotlib
 import matplotlib.pyplot as plt
@@ -8,11 +8,12 @@ import utils
 import numpy as np
 import re
 import logging
-from tensorflow.keras import backend
+from tensorflow.python.keras import backend
 from keras.utils import io_utils
 import flags
 FLAGS = flags.FLAGS
 
+########################################################################################################################
 class monitor(tf.keras.callbacks.Callback):
     def __init__(self, save_dir, dataset=None, fig_size_rate=3):
         super(monitor, self).__init__()
@@ -107,8 +108,9 @@ class monitor(tf.keras.callbacks.Callback):
         white = matplotlib.colors.colorConverter.to_rgba('y', alpha=0.5)
         red = matplotlib.colors.colorConverter.to_rgba('r', alpha=0.7)
         return matplotlib.colors.LinearSegmentedColormap.from_list('rb_cmap', [transparent, white, red], 256)
-#
 
+
+########################################################################################################################
 class load_weights(tf.keras.callbacks.Callback):
     def __init__(self, filepath):
         super(load_weights, self).__init__()
@@ -183,7 +185,7 @@ class load_weights(tf.keras.callbacks.Callback):
             # the file path with the largest file name.
             return file_path_with_largest_file_name
 
-
+########################################################################################################################
 class setLR(Callback):
     def __init__(self, lr, verbose=0):
         super(setLR, self).__init__()
@@ -208,6 +210,7 @@ class setLR(Callback):
             logs = logs or {}
             logs['lr'] = backend.get_value(self.model.optimizer.lr)
 
+########################################################################################################################
 # plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.001)
 
 # early_stopping = EarlyStopping(
