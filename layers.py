@@ -366,8 +366,39 @@ class SaBN(Layer):
     def get_config(self):
         config = super().get_config()
         config.update({
+            "n_class": self.n_class,
             "scale": self.scale,
             "offset": self.offset,
+        })
+        return config
+
+########################################################################################################################
+class SaBN_2(Layer):
+    def __init__(self, n_class):
+        super(SaBN_2, self).__init__()
+        self.n_class = n_class
+        self.BN = BatchNormalization()
+
+    def build(self, input_shape):
+        n_ch = input_shape[-1]
+        self.param = self.param_shape = [-1, 1, 1, n_ch]
+        # Embedding
+        self.scale = Embedding(self.n_class, n_ch, 'RandomNormal')
+        self.offset = Embedding(self.n_class, n_ch, 'Zeros')
+
+    def call(self, inputs, label=None, training=None):
+        if training == False:
+            return self.BN(inputs, training=training)
+        out = self.BN(inputs, training=training)
+        scale = tf.reshape(self.scale(label), self.param_shape)
+        offset = tf.reshape(self.offset(label), self.param_shape)
+        out = scale * out + offset
+        return out
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "n_class": self.n_class,
         })
         return config
 
@@ -390,8 +421,7 @@ class sep_bias(Layer):
     def get_config(self):
         config = super().get_config()
         config.update({
-            "scale": self.scale,
-            "offset": self.offset,
+            "scale": self.input_dims,
         })
         return config
 
