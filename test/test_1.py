@@ -13,13 +13,8 @@ FLAGS = flags.FLAGS
 
 ########################################################################################################################
 def main(*argv, **kwargs):
-    from glob import glob
-    FLAGS.inputs = glob('C:\dataset\\01_KUMC_data\\*\*\\*dwi_RPI_BFC*')
-    for path in FLAGS.inputs:
-    #     data = nib.load(path)
-    #     header = data.header
-    #     img_sz = header.get_data_shape()
-        print(path)
+    a = tf.ones([1,2,2])
+    print(a)
 
     return
 

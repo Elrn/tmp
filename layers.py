@@ -28,6 +28,8 @@ EPSILON = tf.keras.backend.epsilon()
 NEW = tf.newaxis
 ########################################################################################################################
 
+def Adaptive_channel_encoding():
+
 
 ########################################################################################################################
 class DeformableConvLayer(Conv2D):
@@ -415,7 +417,7 @@ class sep_bias(Layer):
 
     def call(self, inputs, label=0, training=None):
         assert self.input_dims >= label
-        x = self.scale(label) * (inputs + self.offset(label))
+        x = self.scale(label) * inputs + self.offset(label)
         return tf.nn.relu(x)
 
     def get_config(self):
