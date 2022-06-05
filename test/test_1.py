@@ -7,15 +7,15 @@ import callbacks
 from os.path import join
 import numpy as np
 import nibabel as nib
+from tensorflow.keras.layers import *
+
 
 import flags
 FLAGS = flags.FLAGS
 
 ########################################################################################################################
 def main(*argv, **kwargs):
-    a = tf.ones([1,2,2])
-    print(a)
-
+    a = BatchNormalization()
     return
 
 if __name__ == '__main__':

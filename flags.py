@@ -49,7 +49,7 @@ flags.DEFINE_string('plot_dir', join(log_dir, 'plot'), 'plot 저장 경로')
 ########################################################################################################################
 """ Predict """
 ########################################################################################################################
-# flags.DEFINE_multi_string('inputs', None, 'list paths for prediction')
-flags.DEFINE_multi_string('inputs', ['C:\dataset\stroke\\00632.nii.gz'], 'list paths for prediction')
+flags.DEFINE_multi_string('inputs', None, 'list paths for prediction')
+# flags.DEFINE_multi_string('inputs', ['C:\dataset\stroke\\00632.nii.gz'], 'list paths for prediction')
 
 ########################################################################################################################

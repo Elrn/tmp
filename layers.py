@@ -3,7 +3,7 @@ from tensorflow.keras.layers import *
 import tensorflow.python.keras.layers.pooling
 from tensorflow.keras.constraints import *
 from tensorflow.keras.initializers import *
-from keras.layers.convolutional import DepthwiseConv
+from keras.layers.convolutional.base_depthwise_conv import DepthwiseConv
 
 import operator
 from tensorflow.python.keras.utils import conv_utils
@@ -17,7 +17,7 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.keras.layers.pooling import Pooling2D
-
+from keras.layers.convolutional.base_conv import Conv
 from keras.utils import tf_utils
 
 import functools
@@ -29,6 +29,7 @@ NEW = tf.newaxis
 ########################################################################################################################
 
 def Adaptive_channel_encoding():
+    return
 
 
 ########################################################################################################################
@@ -337,7 +338,7 @@ class SaBN(Layer):
         https://arxiv.org/abs/2102.11382
     """
     def __init__(self, n_class, axis=-1):
-        super(SaBN, self).__init__()
+        super(Attention, self).__init__()
         self.n_class = n_class
         self.BN = BatchNormalization(axis=axis)
         self.axis = [axis] if isinstance(axis, int) else axis
@@ -426,6 +427,31 @@ class sep_bias(Layer):
             "scale": self.input_dims,
         })
         return config
+
+########################################################################################################################
+class Attention(Layer):
+    def __init__(self, filters, axis=-1):
+        super(Attention, self).__init__()
+        self.filters = filters
+        self.axis = [axis] if isinstance(axis, int) else axis
+
+    def build(self, input_shape):
+        n_ch = input_shape[-1]
+
+        self.scale = self.add_weight("scale", shape=[n_ch, self.units], initializer='HeNormal')
+        self.offset = self.add_weight("offset", shape=[self.filters, n_ch], initializer='HeNormal')
+
+    def call(self, inputs, training=None, **kargs):
+        tf.matmul(a=inputs, b=self.kernel)
+
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "filters": self.filters,
+            "scale": self.scale,
+            "offset": self.offset,
+        })
 
 ########################################################################################################################
 class DepthwiseConv3D(DepthwiseConv):
