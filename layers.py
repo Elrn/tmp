@@ -384,8 +384,6 @@ class SaBN(Layer):
         config = super().get_config()
         config.update({
             'n_class': self.n_class,
-            "scale": self.scale,
-            "offset": self.offset,
         })
         return config
 
