@@ -338,13 +338,12 @@ class SaBN(Layer):
         https://arxiv.org/abs/2102.11382
     """
     def __init__(self, n_class, axis=-1):
-        super(Attention, self).__init__()
+        super(SaBN, self).__init__()
         self.n_class = n_class
         self.BN = BatchNormalization(axis=axis)
         self.axis = [axis] if isinstance(axis, int) else axis
 
     def build(self, input_shape):
-        x_shape, _ = input_shape # except y(label)
         param_shape = self.get_param_shape(input_shape)
 
         self.scale = self.add_weight("scale", shape=param_shape, initializer='ones')
@@ -356,52 +355,37 @@ class SaBN(Layer):
         axis = [ndims + ax if ax < 0 else ax for ax in self.axis]
         axis_to_dim = {x: input_shape[x] for x in axis}
         param_shape = [axis_to_dim[i] if i in axis_to_dim else 1 for i in range(ndims)]
+        param_shape = [self.n_class] + param_shape
+        print(f'param_shape = {param_shape}')
         return param_shape
 
-    def call(self, inputs, training=None, **kargs):
+    def get_slice(self, x, label):
+        x = tf.gather_nd(x, label)
+        x = tf.squeeze(x, 1)
+
+        return x
+
+    def call(self, inputs, label, training=None, **kargs):
         if training == False:
             return self.BN(inputs, training=training)
-        assert len(inputs) == 2
-        x, y = inputs
-        out = self.BN(x, training=training)
-        return self.scale * out + self.offset
+        output = self.BN(inputs, training=training)
+
+        # label = tf.argmax(label, -1)
+        scale = self.get_slice(self.scale, label)
+        offset = self.get_slice(self.offset, label)
+        print(f'label = {label}')
+        print(f'offset = {self.offset.shape}')
+        print(f'offset_gather = {offset.shape}')
+        output = scale * output + offset
+        print(f'output = {output.shape}')
+        return output
 
     def get_config(self):
         config = super().get_config()
         config.update({
-            "n_class": self.n_class,
+            'n_class': self.n_class,
             "scale": self.scale,
             "offset": self.offset,
-        })
-        return config
-
-########################################################################################################################
-class SaBN_2(Layer):
-    def __init__(self, n_class):
-        super(SaBN_2, self).__init__()
-        self.n_class = n_class
-        self.BN = BatchNormalization()
-
-    def build(self, input_shape):
-        n_ch = input_shape[-1]
-        self.param = self.param_shape = [-1, 1, 1, n_ch]
-        # Embedding
-        self.scale = Embedding(self.n_class, n_ch, 'RandomNormal')
-        self.offset = Embedding(self.n_class, n_ch, 'Zeros')
-
-    def call(self, inputs, label=None, training=None):
-        if training == False:
-            return self.BN(inputs, training=training)
-        out = self.BN(inputs, training=training)
-        scale = tf.reshape(self.scale(label), self.param_shape)
-        offset = tf.reshape(self.offset(label), self.param_shape)
-        out = scale * out + offset
-        return out
-
-    def get_config(self):
-        config = super().get_config()
-        config.update({
-            "n_class": self.n_class,
         })
         return config
 
