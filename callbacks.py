@@ -24,6 +24,47 @@ class monitor(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.plot_single_modality(epoch, logs)
 
+    def plot_SaBN(self, epoch, logs=None):
+        epoch += 1
+        cols, rows = 4, FLAGS.bsz
+        figure, axs = plt.subplots(cols, rows, figsize=(rows * 3, cols * 3))
+        # figure.suptitle(f'Epoch: "{epoch}"', fontsize=10)
+        figure.tight_layout()
+
+        data_stack = []
+        pred_stack = []
+        seg_stack = []
+        for data, seg in self.dataset.take(cols//2):
+            pred = self.model(data)
+            data_stack.append(data[0])
+            pred_stack.append(pred)
+            seg_stack.append(seg)
+
+        data = np.concatenate(data_stack, 0)
+        pred = np.concatenate(pred_stack, 0)
+        seg = np.concatenate(seg_stack, 0)
+
+        data = np.squeeze(data)
+        pred = np.squeeze(np.argmax(pred, -1, keepdims=True))
+        seg = np.squeeze(np.argmax(seg, -1, keepdims=True))
+
+        for c in range(cols):
+            for r in range(rows):
+                idx = r + r * c//2
+                axs[c][r].set_xticks([])
+                axs[c][r].set_yticks([])
+                axs[c][r].imshow(data[idx], cmap='gray')
+                if c % 2:
+                    axs[c][r].imshow(pred[idx], cmap='Greens', alpha=0.5)
+                else:
+                    axs[c][r].imshow(seg[idx], cmap='Reds', alpha=0.5)
+
+        save_path = os.path.join(self.save_dir, f'{epoch}.png')
+        # if os.path.exists(save_path) == True:
+        #     save_path = save_path + ' (1)'
+        plt.savefig(save_path, dpi=200)
+        plt.close('all')
+
     def plot_single_modality(self, epoch, logs=None):
         epoch += 1
         cols, rows = 2, FLAGS.bsz
